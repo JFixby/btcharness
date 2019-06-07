@@ -29,8 +29,8 @@ import (
 // hierarchy which promotes reproducibility between harness test runs.
 // Implements harness.TestWallet.
 type InMemoryWallet struct {
-	coinbaseKey  *secp256k1.PrivateKey
-	coinbaseAddr dcrutil.Address
+	coinbaseKey  *btcec.PrivateKey
+	coinbaseAddr btcutil.Address
 
 	// hdRoot is the root master private key for the wallet.
 	hdRoot *hdkeychain.ExtendedKey
@@ -40,11 +40,11 @@ type InMemoryWallet struct {
 
 	// currentHeight is the latest height the wallet is known to be synced
 	// to.
-	currentHeight int64
+	currentHeight int32
 
 	// addrs tracks all addresses belonging to the wallet. The addresses
 	// are indexed by their keypath from the hdRoot.
-	addrs map[uint32]dcrutil.Address
+	addrs map[uint32]btcutil.Address
 
 	// utxos is the set of utxos spendable by the wallet.
 	utxos map[wire.OutPoint]*utxo
@@ -53,7 +53,7 @@ type InMemoryWallet struct {
 	// received. Once a block is disconnected, the undo entry for the
 	// particular height is evaluated, thereby rewinding the effect of the
 	// disconnected block on the wallet's set of spendable utxos.
-	reorgJournal map[int64]*undoEntry
+	reorgJournal map[int32]*undoEntry
 
 	chainUpdates []*chainUpdate
 
@@ -122,10 +122,11 @@ func (wallet *InMemoryWallet) Start(args *coinharness.TestWalletStartArgs) error
 }
 
 func (wallet *InMemoryWallet) updateTxFilter() {
-	filterAddrs := []dcrutil.Address{}
+	filterAddrs := []btcutil.Address{}
 	for _, v := range wallet.addrs {
 		filterAddrs = append(filterAddrs, v)
 	}
+	//pin.D("filterAddrs", filterAddrs)
 	err := wallet.nodeRPC.LoadTxFilter(true, filterAddrs, nil)
 	pin.CheckTestSetupMalfunction(err)
 }
@@ -161,42 +162,28 @@ func (wallet *InMemoryWallet) Dispose() error {
 // SyncedHeight returns the height the wallet is known to be synced to.
 //
 // This function is safe for concurrent access.
-func (wallet *InMemoryWallet) SyncedHeight() int64 {
+func (wallet *InMemoryWallet) SyncedHeight() int32 {
 	wallet.RLock()
 	defer wallet.RUnlock()
 	return wallet.currentHeight
 }
 
 // IngestBlock is a call-back which is to be triggered each time a new block is
-// connected to the main chain. Ingesting a block updates the wallet's internal
-// utxo state based on the outputs created and destroyed within each block.
-func (m *InMemoryWallet) IngestBlock(header []byte, filteredTxns [][]byte) {
-	var hdr wire.BlockHeader
-	if err := hdr.FromBytes(header); err != nil {
-		panic(err)
-	}
-	height := int64(hdr.Height)
-
-	txns := make([]*dcrutil.Tx, 0, len(filteredTxns))
-	for _, txBytes := range filteredTxns {
-		tx, err := dcrutil.NewTxFromBytes(txBytes)
-		if err != nil {
-			panic(err)
-		}
-		txns = append(txns, tx)
-	}
-
+// connected to the main chain. It queues the update for the chain syncer,
+// calling the private version in sequential order.
+func (wallet *InMemoryWallet) IngestBlock(height int32, header *wire.BlockHeader, filteredTxns []*btcutil.Tx) {
 	// Append this new chain update to the end of the queue of new chain
 	// updates.
-	m.chainMtx.Lock()
-	m.chainUpdates = append(m.chainUpdates, &chainUpdate{height, txns})
-	m.chainMtx.Unlock()
+	wallet.chainMtx.Lock()
+	wallet.chainUpdates = append(wallet.chainUpdates, &chainUpdate{height,
+		filteredTxns, true})
+	wallet.chainMtx.Unlock()
 
-	// Launch a goroutine to signal the chainSyncer that a new update is
+	// Start a goroutine to signal the chainSyncer that a new update is
 	// available. We do this in a new goroutine in order to avoid blocking
 	// the main loop of the rpc client.
 	go func() {
-		m.chainUpdateSignal <- chainUpdateSignal
+		wallet.chainUpdateSignal <- chainUpdateSignal
 	}()
 }
 
@@ -284,14 +271,14 @@ func (wallet *InMemoryWallet) evalOutputs(outputs []*wire.TxOut, txHash *chainha
 			// If this is a coinbase output, then we mark the
 			// maturity height at the proper block height in the
 			// future.
-			var maturityHeight int64
+			var maturityHeight int32
 			if isCoinbase {
-				maturityHeight = wallet.currentHeight + int64(wallet.net.CoinbaseMaturity)
+				maturityHeight = wallet.currentHeight + int32(wallet.net.CoinbaseMaturity)
 			}
 
 			op := wire.OutPoint{Hash: *txHash, Index: uint32(i)}
 			wallet.utxos[op] = &utxo{
-				value:          dcrutil.Amount(output.Value),
+				value:          btcutil.Amount(output.Value),
 				keyIndex:       keyIndex,
 				maturityHeight: maturityHeight,
 				pkScript:       pkScript,
@@ -361,7 +348,7 @@ func (wallet *InMemoryWallet) unwindBlock(update *chainUpdate) {
 // newAddress returns a new address from the wallet's hd key chain.  It also
 // loads the address into the RPC client's transaction filter to ensure any
 // transactions that involve it are delivered via the notifications.
-func (wallet *InMemoryWallet) newAddress() (dcrutil.Address, error) {
+func (wallet *InMemoryWallet) integrationdress() (btcutil.Address, error) {
 	index := wallet.hdIndex
 
 	childKey, err := wallet.hdRoot.Child(index)
@@ -378,7 +365,7 @@ func (wallet *InMemoryWallet) newAddress() (dcrutil.Address, error) {
 		return nil, err
 	}
 
-	err = wallet.nodeRPC.LoadTxFilter(false, []dcrutil.Address{addr}, nil)
+	err = wallet.nodeRPC.LoadTxFilter(false, []btcutil.Address{addr}, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -397,7 +384,7 @@ func (wallet *InMemoryWallet) NewAddress(_ *coinharness.NewAddressArgs) (coinhar
 	wallet.Lock()
 	defer wallet.Unlock()
 
-	return wallet.newAddress()
+	return wallet.integrationdress()
 }
 
 // fundTx attempts to fund a transaction sending amt coins.  The coins are
@@ -414,7 +401,7 @@ func (wallet *InMemoryWallet) fundTx(tx *wire.MsgTx, amt dcrutil.Amount, feeRate
 	)
 
 	var (
-		amtSelected dcrutil.Amount
+		amtSelected btcutil.Amount
 		txSize      int
 	)
 
@@ -430,23 +417,24 @@ func (wallet *InMemoryWallet) fundTx(tx *wire.MsgTx, amt dcrutil.Amount, feeRate
 		// Add the selected output to the transaction, updating the
 		// current tx size while accounting for the size of the future
 		// sigScript.
-		tx.AddTxIn(wire.NewTxIn(&outPoint, int64(utxo.value), nil))
+		tx.AddTxIn(wire.NewTxIn(&outPoint, nil, nil))
 		txSize = tx.SerializeSize() + spendSize*len(tx.TxIn)
 
 		// Calculate the fee required for the txn at this point
 		// observing the specified fee rate. If we don't have enough
 		// coins from he current amount selected to pay the fee, then
 		// continue to grab more coins.
-		reqFee := dcrutil.Amount(txSize * int(feeRate))
+		reqFee := btcutil.Amount(txSize * int(feeRate))
 		if amtSelected-reqFee < amt {
 			continue
 		}
 
-		// If we have any change left over, then add an additional
-		// output to the transaction reserved for change.
+		// If we have any change left over and we should create a change
+		// output, then add an additional output to the transaction
+		// reserved for it.
 		changeVal := amtSelected - amt - reqFee
-		if changeVal > 0 {
-			addr, err := wallet.newAddress()
+		if changeVal > 0 && change {
+			addr, err := wallet.integrationdress()
 			if err != nil {
 				return err
 			}
@@ -521,11 +509,11 @@ func (wallet *InMemoryWallet) CreateTransaction(args *coinharness.CreateTransact
 	wallet.Lock()
 	defer wallet.Unlock()
 
-	tx := wire.NewMsgTx()
+	tx := wire.NewMsgTx(wire.TxVersion)
 
 	// Tally up the total amount to be sent in order to perform coin
 	// selection shortly below.
-	var outputAmt dcrutil.Amount
+	var outputAmt btcutil.Amount
 	for _, output := range args.Outputs {
 		outputAmt += dcrutil.Amount(output.(*wire.TxOut).Value)
 		tx.AddTxOut(output.(*wire.TxOut))

@@ -5,14 +5,13 @@
 package memwallet
 
 import (
-	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/hdkeychain"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/jfixby/coinharness"
+	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcutil/hdkeychain"
 	"github.com/jfixby/btcharness"
+	"github.com/jfixby/coinharness"
 	"github.com/jfixby/pin"
 )
 
@@ -66,5 +65,6 @@ func newMemWallet(net *chaincfg.Params, harnessHDSeed [chainhash.HashSize + 4]by
 		utxos:             make(map[wire.OutPoint]*utxo),
 		chainUpdateSignal: make(chan string),
 		reorgJournal:      make(map[int32]*undoEntry),
+		RPCClientFactory:  clientFac,
 	}, nil
 }

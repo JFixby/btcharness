@@ -80,28 +80,30 @@ func (wallet *InMemoryWallet) Network() coinharness.Network {
 func (wallet *InMemoryWallet) Start(args *coinharness.TestWalletStartArgs) error {
 	handlers := &rpcclient.NotificationHandlers{}
 
-	// If a handler for the OnBlockConnected/OnBlockDisconnected callback
-	// has already been set, then we create a wrapper callback which
 	// executes both the currently registered callback, and the mem
 	// wallet's callback.
-	if handlers.OnBlockConnected != nil {
-		obc := handlers.OnBlockConnected
-		handlers.OnBlockConnected = func(header []byte, filteredTxns [][]byte) {
-			wallet.IngestBlock(header, filteredTxns)
-			obc(header, filteredTxns)
+	// If a handler for the OnFilteredBlock{Connected,Disconnected} callback
+	// callback has already been set, then create a wrapper callback which
+	// executes both the currently registered callback and the mem wallet's
+	// callback.
+	if handlers.OnFilteredBlockConnected != nil {
+		obc := handlers.OnFilteredBlockConnected
+		handlers.OnFilteredBlockConnected = func(height int32, header *wire.BlockHeader, filteredTxns []*btcutil.Tx) {
+			wallet.IngestBlock(height, header, filteredTxns)
+			obc(height, header, filteredTxns)
 		}
 	} else {
 		// Otherwise, we can claim the callback ourselves.
-		handlers.OnBlockConnected = wallet.IngestBlock
+		handlers.OnFilteredBlockConnected = wallet.IngestBlock
 	}
-	if handlers.OnBlockDisconnected != nil {
-		obd := handlers.OnBlockDisconnected
-		handlers.OnBlockDisconnected = func(header []byte) {
-			wallet.UnwindBlock(header)
-			obd(header)
+	if handlers.OnFilteredBlockDisconnected != nil {
+		obd := handlers.OnFilteredBlockDisconnected
+		handlers.OnFilteredBlockDisconnected = func(height int32, header *wire.BlockHeader) {
+			wallet.UnwindBlock(height, header)
+			obd(height, header)
 		}
 	} else {
-		handlers.OnBlockDisconnected = wallet.UnwindBlock
+		handlers.OnFilteredBlockDisconnected = wallet.UnwindBlock
 	}
 
 	//handlers.OnClientConnected = wallet.onDcrdConnect
@@ -231,26 +233,12 @@ func (wallet *InMemoryWallet) chainSyncer() {
 		wallet.chainUpdates = wallet.chainUpdates[1:]
 		wallet.chainMtx.Unlock()
 
-		// Update the latest synced height, then process each filtered
-		// transaction in the block creating and destroying utxos within
-		// the wallet as a result.
 		wallet.Lock()
-		wallet.currentHeight = update.blockHeight
-		undo := &undoEntry{
-			utxosDestroyed: make(map[wire.OutPoint]*utxo),
+		if update.isConnect {
+			wallet.ingestBlock(update)
+		} else {
+			wallet.unwindBlock(update)
 		}
-		for _, tx := range update.filteredTxns {
-			mtx := tx.MsgTx()
-			isCoinbase := blockchain.IsCoinBaseTx(mtx)
-			txHash := mtx.TxHash()
-			wallet.evalOutputs(mtx.TxOut, &txHash, isCoinbase, undo)
-			wallet.evalInputs(mtx.TxIn, undo)
-		}
-
-		// Finally, record the undo entry for this block so we can
-		// properly update our internal state in response to the block
-		// being re-org'd from the main chain.
-		wallet.reorgJournal[update.blockHeight] = undo
 		wallet.Unlock()
 	}
 }
@@ -305,29 +293,22 @@ func (wallet *InMemoryWallet) evalInputs(inputs []*wire.TxIn, undo *undoEntry) {
 }
 
 // UnwindBlock is a call-back which is to be executed each time a block is
-// disconnected from the main chain. Unwinding a block undoes the effect that a
-// particular block had on the wallet's internal utxo state.
-func (m *InMemoryWallet) UnwindBlock(header []byte) {
-	var hdr wire.BlockHeader
-	if err := hdr.FromBytes(header); err != nil {
-		panic(err)
-	}
-	height := int64(hdr.Height)
+// disconnected from the main chain. It queues the update for the chain syncer,
+// calling the private version in sequential order.
+func (wallet *InMemoryWallet) UnwindBlock(height int32, header *wire.BlockHeader) {
+	// Append this new chain update to the end of the queue of new chain
+	// updates.
+	wallet.chainMtx.Lock()
+	wallet.chainUpdates = append(wallet.chainUpdates, &chainUpdate{height,
+		nil, false})
+	wallet.chainMtx.Unlock()
 
-	m.Lock()
-	defer m.Unlock()
-
-	undo := m.reorgJournal[height]
-
-	for _, utxo := range undo.utxosCreated {
-		delete(m.utxos, utxo)
-	}
-
-	for outPoint, utxo := range undo.utxosDestroyed {
-		m.utxos[outPoint] = utxo
-	}
-
-	delete(m.reorgJournal, height)
+	// Start a goroutine to signal the chainSyncer that a new update is
+	// available. We do this in a new goroutine in order to avoid blocking
+	// the main loop of the rpc client.
+	go func() {
+		wallet.chainUpdateSignal <- chainUpdateSignal
+	}()
 }
 
 // unwindBlock undoes the effect that a particular block had on the wallet's
@@ -346,7 +327,7 @@ func (wallet *InMemoryWallet) unwindBlock(update *chainUpdate) {
 	delete(wallet.reorgJournal, update.blockHeight)
 }
 
-// newAddress returns a new address from the wallet's hd key chain.  It also
+// integrationdress returns a new address from the wallet's hd key chain.  It also
 // loads the address into the RPC client's transaction filter to ensure any
 // transactions that involve it are delivered via the notifications.
 func (wallet *InMemoryWallet) integrationdress() (btcutil.Address, error) {
@@ -388,13 +369,16 @@ func (wallet *InMemoryWallet) NewAddress(_ *coinharness.NewAddressArgs) (coinhar
 	return wallet.integrationdress()
 }
 
-// fundTx attempts to fund a transaction sending amt coins.  The coins are
-// selected such that the final amount spent pays enough fees as dictated by
-// the passed fee rate.  The passed fee rate should be expressed in
-// atoms-per-byte.
+// fundTx attempts to fund a transaction sending amt bitcoin. The coins are
+// selected such that the final amount spent pays enough fees as dictated by the
+// passed fee rate. The passed fee rate should be expressed in
+// satoshis-per-byte. The transaction being funded can optionally include a
+// change output indicated by the change boolean.
 //
-// NOTE: The InMemoryWallet's mutex must be held when this function is called.
-func (wallet *InMemoryWallet) fundTx(tx *wire.MsgTx, amt btcutil.Amount, feeRate btcutil.Amount) error {
+// NOTE: The memWallet's mutex must be held when this function is called.
+func (wallet *InMemoryWallet) fundTx(tx *wire.MsgTx, amt btcutil.Amount,
+	feeRate btcutil.Amount, change bool) error {
+
 	const (
 		// spendSize is the largest number of bytes of a sigScript
 		// which spends a p2pkh output: OP_DATA_73 <sig> OP_DATA_33 <pubkey>
@@ -465,6 +449,7 @@ func (wallet *InMemoryWallet) SendOutputs(args coinharness.SendOutputsArgs) (coi
 	arg2 := &coinharness.CreateTransactionArgs{
 		Outputs: args.Outputs,
 		FeeRate: args.FeeRate,
+		Change:  true,
 	}
 	tx, err := wallet.CreateTransaction(arg2)
 	if err != nil {
@@ -490,6 +475,7 @@ func (wallet *InMemoryWallet) SendOutputsWithoutChange(outputs []*wire.TxOut,
 	args := &coinharness.CreateTransactionArgs{
 		Outputs: b,
 		FeeRate: feeRate,
+		Change:  false,
 	}
 	tx, err := wallet.CreateTransaction(args)
 	if err != nil {

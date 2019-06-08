@@ -7,8 +7,6 @@ package memwallet
 import (
 	"bytes"
 	"fmt"
-	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcutil"
 	"github.com/jfixby/coinharness"
 	"github.com/jfixby/pin"
 	"sync"
@@ -507,7 +505,7 @@ func (wallet *InMemoryWallet) CreateTransaction(args *coinharness.CreateTransact
 	}
 
 	// Attempt to fund the transaction with spendable utxos.
-	if err := wallet.fundTx(tx, outputAmt, btcutil.Amount(args.FeeRate.(int))); err != nil {
+	if err := wallet.fundTx(tx, outputAmt, btcutil.Amount(args.FeeRate.(int)), args.Change); err != nil {
 		return nil, err
 	}
 

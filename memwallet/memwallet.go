@@ -392,7 +392,7 @@ func (wallet *InMemoryWallet) NewAddress(_ *coinharness.NewAddressArgs) (coinhar
 // atoms-per-byte.
 //
 // NOTE: The InMemoryWallet's mutex must be held when this function is called.
-func (wallet *InMemoryWallet) fundTx(tx *wire.MsgTx, amt dcrutil.Amount, feeRate dcrutil.Amount) error {
+func (wallet *InMemoryWallet) fundTx(tx *wire.MsgTx, amt btcutil.Amount, feeRate btcutil.Amount) error {
 	const (
 		// spendSize is the largest number of bytes of a sigScript
 		// which spends a p2pkh output: OP_DATA_73 <sig> OP_DATA_33 <pubkey>
@@ -476,7 +476,7 @@ func (wallet *InMemoryWallet) SendOutputs(args coinharness.SendOutputsArgs) (coi
 // specified outputs while observing the passed fee rate and ignoring a change
 // output. The passed fee rate should be expressed in sat/b.
 func (wallet *InMemoryWallet) SendOutputsWithoutChange(outputs []*wire.TxOut,
-	feeRate dcrutil.Amount) (*chainhash.Hash, error) {
+	feeRate btcutil.Amount) (*chainhash.Hash, error) {
 
 	//cast list
 	b := make([]coinharness.OutputTx, len(outputs))
@@ -514,12 +514,12 @@ func (wallet *InMemoryWallet) CreateTransaction(args *coinharness.CreateTransact
 	// selection shortly below.
 	var outputAmt btcutil.Amount
 	for _, output := range args.Outputs {
-		outputAmt += dcrutil.Amount(output.(*wire.TxOut).Value)
+		outputAmt += btcutil.Amount(output.(*wire.TxOut).Value)
 		tx.AddTxOut(output.(*wire.TxOut))
 	}
 
 	// Attempt to fund the transaction with spendable utxos.
-	if err := wallet.fundTx(tx, outputAmt, dcrutil.Amount(args.FeeRate.(int))); err != nil {
+	if err := wallet.fundTx(tx, outputAmt, btcutil.Amount(args.FeeRate.(int))); err != nil {
 		return nil, err
 	}
 

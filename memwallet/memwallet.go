@@ -7,21 +7,20 @@ package memwallet
 import (
 	"bytes"
 	"fmt"
+	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcutil"
 	"github.com/jfixby/coinharness"
 	"github.com/jfixby/pin"
 	"sync"
 	"time"
 
-	"github.com/decred/btcd/blockchain"
-	"github.com/decred/btcd/chaincfg"
-	"github.com/decred/btcd/chaincfg/chainhash"
-	"github.com/decred/btcd/dcrec/secp256k1"
-	"github.com/decred/btcd/dcrutil"
-	"github.com/decred/btcd/hdkeychain"
-	"github.com/decred/btcd/rpcclient"
-	"github.com/decred/btcd/txscript"
-	"github.com/decred/btcd/wire"
+	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/hdkeychain"
+	"github.com/btcsuite/btcd/rpcclient"
+	"github.com/btcsuite/btcd/txscript"
+	"github.com/btcsuite/btcd/wire"
 )
 
 // InMemoryWallet is a simple in-memory wallet whose purpose is to provide basic

@@ -5,11 +5,10 @@
 package memwallet
 
 import (
+	"github.com/btcsuite/btcd/btcec"
+	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
-	"github.com/decred/btcd/chaincfg"
-	"github.com/decred/btcd/dcrec/secp256k1"
-	"github.com/decred/btcd/dcrutil"
-	"github.com/decred/btcd/wire"
 )
 
 const chainUpdateSignal = "chainUpdateSignal"

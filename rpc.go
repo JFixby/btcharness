@@ -6,7 +6,7 @@ package btcharness
 
 import (
 	"fmt"
-	"github.com/decred/btcd/rpcclient"
+	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/jfixby/coinharness"
 	"github.com/jfixby/pin"
 	"io/ioutil"

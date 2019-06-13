@@ -25,7 +25,7 @@ type GenerateBlockArgs struct {
 	BlockVersion  int32
 	BlockTime     time.Time
 	MineTo        []wire.TxOut
-	MiningAddress btcutil.Address
+	MiningAddress *btcutil.Address
 	Network       *chaincfg.Params
 }
 
@@ -96,7 +96,7 @@ func GenerateAndSubmitBlockWithCustomCoinbaseOutputs(client *rpcclient.Client, a
 // second is used. Passing nil for the previous block results in a block that
 // builds off of the genesis block for the specified chain.
 func CreateBlock(prevBlock *btcutil.Block, inclusionTxs []*btcutil.Tx,
-	blockVersion int32, blockTime time.Time, miningAddr btcutil.Address,
+	blockVersion int32, blockTime time.Time, miningAddr *btcutil.Address,
 	mineTo []wire.TxOut, net *chaincfg.Params) (*btcutil.Block, error) {
 
 	var (
@@ -247,11 +247,11 @@ func standardCoinbaseScript(nextBlockHeight int32, extraNonce uint64) ([]byte, e
 // createCoinbaseTx returns a coinbase transaction paying an appropriate
 // subsidy based on the passed block height to the provided address.
 func createCoinbaseTx(coinbaseScript []byte, nextBlockHeight int32,
-	addr btcutil.Address, mineTo []wire.TxOut,
+	addr *btcutil.Address, mineTo []wire.TxOut,
 	net *chaincfg.Params) (*btcutil.Tx, error) {
 
 	// Create the script to pay to the provided payment address.
-	pkScript, err := txscript.PayToAddrScript(addr)
+	pkScript, err := txscript.PayToAddrScript(*addr)
 	if err != nil {
 		return nil, err
 	}

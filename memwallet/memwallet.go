@@ -365,18 +365,20 @@ func (wallet *InMemoryWallet) NewAddress(_ *coinharness.NewAddressArgs) (coinhar
 
 	add, err := wallet.newAddress()
 
+	if err != nil {
+		return nil, err
+	}
+
+	return &dcrharness.DCRAddress{Address: add}, nil
 }
 
-// fundTx attempts to fund a transaction sending amt bitcoin. The coins are
-// selected such that the final amount spent pays enough fees as dictated by the
-// passed fee rate. The passed fee rate should be expressed in
-// satoshis-per-byte. The transaction being funded can optionally include a
-// change output indicated by the change boolean.
+// fundTx attempts to fund a transaction sending amt coins.  The coins are
+// selected such that the final amount spent pays enough fees as dictated by
+// the passed fee rate.  The passed fee rate should be expressed in
+// atoms-per-byte.
 //
-// NOTE: The memWallet's mutex must be held when this function is called.
-func (wallet *InMemoryWallet) fundTx(tx *wire.MsgTx, amt btcutil.Amount,
-	feeRate btcutil.Amount, change bool) error {
-
+// NOTE: The InMemoryWallet's mutex must be held when this function is called.
+func (wallet *InMemoryWallet) fundTx(tx *wire.MsgTx, amt dcrutil.Amount, feeRate dcrutil.Amount) error {
 	const (
 		// spendSize is the largest number of bytes of a sigScript
 		// which spends a p2pkh output: OP_DATA_73 <sig> OP_DATA_33 <pubkey>
@@ -400,7 +402,7 @@ func (wallet *InMemoryWallet) fundTx(tx *wire.MsgTx, amt btcutil.Amount,
 		// Add the selected output to the transaction, updating the
 		// current tx size while accounting for the size of the future
 		// sigScript.
-		tx.AddTxIn(wire.NewTxIn(&outPoint, nil, nil))
+		tx.AddTxIn(wire.NewTxIn(&outPoint, int64(utxo.value), nil))
 		txSize = tx.SerializeSize() + spendSize*len(tx.TxIn)
 
 		// Calculate the fee required for the txn at this point
@@ -417,7 +419,7 @@ func (wallet *InMemoryWallet) fundTx(tx *wire.MsgTx, amt btcutil.Amount,
 		// reserved for it.
 		changeVal := amtSelected - amt - reqFee
 		if changeVal > 0 && change {
-			addr, err := wallet.integrationdress()
+			addr, err := wallet.newAddress()
 			if err != nil {
 				return err
 			}
@@ -467,7 +469,7 @@ func (wallet *InMemoryWallet) SendOutputsWithoutChange(outputs []*wire.TxOut,
 	b := make([]coinharness.OutputTx, len(outputs))
 	{
 		for i := range outputs {
-			b[i] = outputs[i]
+			b[i] = &dcrharness.OutputTx{outputs[i]}
 		}
 	}
 	args := &coinharness.CreateTransactionArgs{
@@ -480,7 +482,8 @@ func (wallet *InMemoryWallet) SendOutputsWithoutChange(outputs []*wire.TxOut,
 		return nil, err
 	}
 
-	return wallet.nodeRPC.SendRawTransaction(tx.(*wire.MsgTx), true)
+	r, x := wallet.nodeRPC.SendRawTransaction(tx, true)
+	return r.(*chainhash.Hash), x
 }
 
 // CreateTransaction returns a fully signed transaction paying to the specified
@@ -501,7 +504,7 @@ func (wallet *InMemoryWallet) CreateTransaction(args *coinharness.CreateTransact
 	var outputAmt btcutil.Amount
 	for _, output := range args.Outputs {
 		outputAmt += btcutil.Amount(output.(*wire.TxOut).Value)
-		tx.AddTxOut(output.(*wire.TxOut))
+		tx.AddTxOut(output.(*dcrharness.OutputTx).Parent)
 	}
 
 	// Attempt to fund the transaction with spendable utxos.
@@ -545,36 +548,37 @@ func (wallet *InMemoryWallet) CreateTransaction(args *coinharness.CreateTransact
 	for _, utxo := range spentOutputs {
 		utxo.isLocked = true
 	}
-
-	return tx, nil
+	return &dcrharness.CreatedTransactionTx{tx}, nil
 }
 
 // UnlockOutputs unlocks any outputs which were previously locked due to
 // being selected to fund a transaction via the CreateTransaction method.
 //
 // This function is safe for concurrent access.
-func (wallet *InMemoryWallet) UnlockOutputs(inputs []coinharness.InputTx) {
+func (wallet *InMemoryWallet) UnlockOutputs(inputs []coinharness.InputTx) error {
 	wallet.Lock()
 	defer wallet.Unlock()
 
 	for _, input := range inputs {
-		utxo, ok := wallet.utxos[input.(*wire.TxIn).PreviousOutPoint]
+		utxo, ok := wallet.utxos[input.PreviousOutPoint().(wire.OutPoint)]
 		if !ok {
 			continue
 		}
 
 		utxo.isLocked = false
 	}
+
+	return nil
 }
 
-// ConfirmedBalance returns the confirmed balance of the wallet.
+// GetBalance returns the confirmed balance of the wallet.
 //
 // This function is safe for concurrent access.
-func (wallet *InMemoryWallet) ConfirmedBalance() coinharness.CoinsAmount {
+func (wallet *InMemoryWallet) GetBalance(account string) (*coinharness.GetBalanceResult, error) {
 	wallet.RLock()
 	defer wallet.RUnlock()
-
-	var balance btcutil.Amount
+	result := &coinharness.GetBalanceResult{}
+	var balance dcrutil.Amount
 	for _, utxo := range wallet.utxos {
 		// Prevent any immature or locked outputs from contributing to
 		// the wallet's total confirmed balance.
@@ -585,5 +589,33 @@ func (wallet *InMemoryWallet) ConfirmedBalance() coinharness.CoinsAmount {
 		balance += utxo.value
 	}
 
-	return balance
+	result.TotalSpendable = balance
+	return result, nil
+}
+
+func (wallet *InMemoryWallet) RPCClient() *coinharness.RPCConnection {
+	panic("Method not supported")
+}
+
+func (wallet *InMemoryWallet) CreateNewAccount(accountName string) error {
+	panic("")
+}
+
+func (wallet *InMemoryWallet) GetNewAddress(accountName string) (coinharness.Address, error) {
+	panic("")
+}
+func (wallet *InMemoryWallet) ValidateAddress(address coinharness.Address) (*coinharness.ValidateAddressResult, error) {
+	panic("")
+}
+
+func (wallet *InMemoryWallet) WalletUnlock(password string, seconds int64) error {
+	return nil
+}
+func (wallet *InMemoryWallet) WalletInfo() (*coinharness.WalletInfoResult, error) {
+	return &coinharness.WalletInfoResult{
+		Unlocked: true,
+	}, nil
+}
+func (wallet *InMemoryWallet) WalletLock() error {
+	return nil
 }

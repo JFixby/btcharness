@@ -18,7 +18,7 @@ const stopSignal = "stopSignal"
 // used to sync up the InMemoryWallet each time a new block is connected to the main
 // chain.
 type chainUpdate struct {
-	blockHeight  int32
+	blockHeight  int64
 	filteredTxns []*btcutil.Tx
 	isConnect    bool // True if connect, false if disconnect
 }
@@ -37,14 +37,14 @@ type undoEntry struct {
 type utxo struct {
 	pkScript       []byte
 	value          btcutil.Amount
-	maturityHeight int32
+	maturityHeight int64
 	keyIndex       uint32
 	isLocked       bool
 }
 
 // isMature returns true if the target utxo is considered "mature" at the
 // passed block height. Otherwise, false is returned.
-func (u *utxo) isMature(height int32) bool {
+func (u *utxo) isMature(height int64) bool {
 	return height >= u.maturityHeight
 }
 

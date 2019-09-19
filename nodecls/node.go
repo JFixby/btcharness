@@ -12,7 +12,6 @@ import (
 	"github.com/jfixby/coinharness/consolenode"
 	"github.com/jfixby/pin"
 	"github.com/jfixby/pin/commandline"
-	"path/filepath"
 )
 
 // ConsoleNodeFactory produces a new ConsoleNode-instance upon request
@@ -70,7 +69,7 @@ func (cook *BtcdConsoleCommandCook) CookArguments(par *consolenode.ConsoleComman
 	if par.MiningAddress != nil {
 		result["miningaddr"] = par.MiningAddress.String()
 	}
-	result[dcrharness.NetworkFor(par.Network)] = commandline.NoArgumentValue
+	result[btcharness.NetworkFor(par.Network)] = commandline.NoArgumentValue
 
 	commandline.ArgumentsCopyTo(par.ExtraArguments, result)
 	return result

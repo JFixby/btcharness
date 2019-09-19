@@ -7,6 +7,7 @@ package memwallet
 import (
 	"bytes"
 	"fmt"
+	"github.com/jfixby/btcharness"
 	"github.com/jfixby/coinharness"
 	"github.com/jfixby/pin"
 	"sync"
@@ -104,8 +105,6 @@ func (wallet *InMemoryWallet) Start(args *coinharness.TestWalletStartArgs) error
 		handlers.OnFilteredBlockDisconnected = wallet.UnwindBlock
 	}
 
-	//handlers.OnClientConnected = wallet.onDcrdConnect
-
 	wallet.nodeRPC = coinharness.NewRPCConnection(wallet.RPCClientFactory, args.NodeRPCConfig, 5, handlers)
 	pin.AssertNotNil("nodeRPC", wallet.nodeRPC)
 
@@ -113,7 +112,7 @@ func (wallet *InMemoryWallet) Start(args *coinharness.TestWalletStartArgs) error
 	// wallet.
 	wallet.updateTxFilter()
 
-	// Ensure dcrd properly dispatches our registered call-back for each new
+	// Ensure btcd properly dispatches our registered call-back for each new
 	// block. Otherwise, the InMemoryWallet won't function properly.
 	err := wallet.nodeRPC.NotifyBlocks()
 	pin.CheckTestSetupMalfunction(err)
@@ -327,7 +326,7 @@ func (wallet *InMemoryWallet) unwindBlock(update *chainUpdate) {
 // newAddress returns a new address from the wallet's hd key chain.  It also
 // loads the address into the RPC client's transaction filter to ensure any
 // transactions that involve it are delivered via the notifications.
-func (wallet *InMemoryWallet) newAddress() (dcrutil.Address, error) {
+func (wallet *InMemoryWallet) newAddress() (btcutil.Address, error) {
 	index := wallet.hdIndex
 
 	childKey, err := wallet.hdRoot.Child(index)
@@ -369,7 +368,7 @@ func (wallet *InMemoryWallet) NewAddress(_ *coinharness.NewAddressArgs) (coinhar
 		return nil, err
 	}
 
-	return &dcrharness.DCRAddress{Address: add}, nil
+	return &btcharness.BTCAddress{Address: add}, nil
 }
 
 // fundTx attempts to fund a transaction sending amt coins.  The coins are
@@ -378,7 +377,7 @@ func (wallet *InMemoryWallet) NewAddress(_ *coinharness.NewAddressArgs) (coinhar
 // atoms-per-byte.
 //
 // NOTE: The InMemoryWallet's mutex must be held when this function is called.
-func (wallet *InMemoryWallet) fundTx(tx *wire.MsgTx, amt dcrutil.Amount, feeRate dcrutil.Amount) error {
+func (wallet *InMemoryWallet) fundTx(tx *wire.MsgTx, amt btcutil.Amount, feeRate btcutil.Amount) error {
 	const (
 		// spendSize is the largest number of bytes of a sigScript
 		// which spends a p2pkh output: OP_DATA_73 <sig> OP_DATA_33 <pubkey>
@@ -469,7 +468,7 @@ func (wallet *InMemoryWallet) SendOutputsWithoutChange(outputs []*wire.TxOut,
 	b := make([]coinharness.OutputTx, len(outputs))
 	{
 		for i := range outputs {
-			b[i] = &dcrharness.OutputTx{outputs[i]}
+			b[i] = &btcharness.OutputTx{outputs[i]}
 		}
 	}
 	args := &coinharness.CreateTransactionArgs{
@@ -504,7 +503,7 @@ func (wallet *InMemoryWallet) CreateTransaction(args *coinharness.CreateTransact
 	var outputAmt btcutil.Amount
 	for _, output := range args.Outputs {
 		outputAmt += btcutil.Amount(output.(*wire.TxOut).Value)
-		tx.AddTxOut(output.(*dcrharness.OutputTx).Parent)
+		tx.AddTxOut(output.(*btcharness.OutputTx).Parent)
 	}
 
 	// Attempt to fund the transaction with spendable utxos.
@@ -548,7 +547,7 @@ func (wallet *InMemoryWallet) CreateTransaction(args *coinharness.CreateTransact
 	for _, utxo := range spentOutputs {
 		utxo.isLocked = true
 	}
-	return &dcrharness.CreatedTransactionTx{tx}, nil
+	return &btcharness.CreatedTransactionTx{tx}, nil
 }
 
 // UnlockOutputs unlocks any outputs which were previously locked due to
@@ -578,7 +577,7 @@ func (wallet *InMemoryWallet) GetBalance(account string) (*coinharness.GetBalanc
 	wallet.RLock()
 	defer wallet.RUnlock()
 	result := &coinharness.GetBalanceResult{}
-	var balance dcrutil.Amount
+	var balance btcutil.Amount
 	for _, utxo := range wallet.utxos {
 		// Prevent any immature or locked outputs from contributing to
 		// the wallet's total confirmed balance.

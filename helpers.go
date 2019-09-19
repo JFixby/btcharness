@@ -3,7 +3,7 @@ package btcharness
 import (
 	"errors"
 	"fmt"
-	"github.com/btcsuite/btcd/rpcclient"
+	"github.com/jfixby/coinharness"
 	"github.com/jfixby/pin"
 	"math"
 	"math/big"
@@ -35,7 +35,7 @@ type GenerateBlockArgs struct {
 // transactions to be mined. Additionally, a custom block version can be set by
 // the caller. An uninitialized time.Time should be used for the
 // blockTime parameter if one doesn't wish to set a custom time.
-func GenerateAndSubmitBlock(client coinharness.RPCClient, args *GenerateBlockArgs) (*dcrutil.Block, error) {
+func GenerateAndSubmitBlock(client coinharness.RPCClient, args *GenerateBlockArgs) (*btcutil.Block, error) {
 	pin.AssertTrue("args.MineTo is empty", len(args.MineTo) == 0)
 	return GenerateAndSubmitBlockWithCustomCoinbaseOutputs(client, args)
 }
@@ -52,7 +52,7 @@ func GenerateAndSubmitBlock(client coinharness.RPCClient, args *GenerateBlockArg
 // submitted; thus, it is the caller's responsibility to ensure that the outputs
 // are correct. If the list is empty, the coinbase reward goes to the wallet
 // managed by the Harness.
-func GenerateAndSubmitBlockWithCustomCoinbaseOutputs(client coinharness.RPCClient, args *GenerateBlockArgs) (*dcrutil.Block, error) {
+func GenerateAndSubmitBlockWithCustomCoinbaseOutputs(client coinharness.RPCClient, args *GenerateBlockArgs) (*btcutil.Block, error) {
 	txns := args.Txns
 	blockVersion := args.BlockVersion
 	pin.AssertTrue(fmt.Sprintf("Incorrect blockVersion(%v)", blockVersion), blockVersion > 0)
@@ -72,7 +72,7 @@ func GenerateAndSubmitBlockWithCustomCoinbaseOutputs(client coinharness.RPCClien
 		return nil, err
 	}
 	prevBlock := btcutil.NewBlock(mBlock)
-	prevBlock.SetHeight(prevBlockHeight)
+	prevBlock.SetHeight(int32(prevBlockHeight))
 
 	// Create a new block including the specified transactions
 	newBlock, err := CreateBlock(prevBlock, txns, blockVersion,
@@ -280,7 +280,7 @@ func createCoinbaseTx(coinbaseScript []byte, nextBlockHeight int32,
 
 func TransactionTxToRaw(tx coinharness.CreatedTransactionTx) *wire.MsgTx {
 	ttx := &wire.MsgTx{
-		Version:  uint16(tx.Version()),
+		Version:  int32(tx.Version()),
 		LockTime: tx.LockTime(),
 	}
 	for _, ti := range tx.TxIn() {

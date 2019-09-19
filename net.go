@@ -1,8 +1,8 @@
-package dcrharness
+package btcharness
 
 import (
 	"fmt"
-	"github.com/decred/dcrd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/jfixby/coinharness"
 	"github.com/jfixby/pin"
 	"github.com/jfixby/pin/commandline"
@@ -16,8 +16,8 @@ func NetworkFor(net coinharness.Network) string {
 	if net == &chaincfg.TestNet3Params {
 		return "testnet"
 	}
-	if net == &chaincfg.RegNetParams {
-		return "regnet"
+	if net == &chaincfg.RegressionNetParams {
+		return "regtest"
 	}
 	if net == &chaincfg.MainNetParams {
 		// no argument needed for the MainNet

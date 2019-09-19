@@ -1,9 +1,9 @@
 package walletcls
 
 import (
+	"github.com/jfixby/btcharness"
 	"github.com/jfixby/coinharness"
 	"github.com/jfixby/coinharness/consolewallet"
-	"github.com/jfixby/dcrharness"
 	"github.com/jfixby/pin"
 	"github.com/jfixby/pin/commandline"
 )
@@ -13,7 +13,7 @@ type ConsoleWalletFactory struct {
 	// WalletExecutablePathProvider returns path to the btcd executable
 	WalletExecutablePathProvider commandline.ExecutablePathProvider
 	ConsoleCommandCook           WalletConsoleCommandCook
-	RPCClientFactory             dcrharness.DcrRPCClientFactory
+	RPCClientFactory             btcharness.BtcRPCClientFactory
 }
 
 // NewWallet creates and returns a fully initialized instance of the ConsoleWallet.
@@ -53,8 +53,8 @@ type WalletConsoleCommandCook struct {
 func (cook *WalletConsoleCommandCook) CookArguments(par *consolewallet.ConsoleCommandParams) map[string]interface{} {
 	result := make(map[string]interface{})
 
-	result["dcrdusername"] = par.NodeRpcUser
-	result["dcrdpassword"] = par.NodeRpcPass
+	result["btcdusername"] = par.NodeRpcUser
+	result["btcdpassword"] = par.NodeRpcPass
 	result["username"] = par.WalletRpcUser
 	result["password"] = par.WalletRpcPass
 	result["rpcconnect"] = par.RpcConnect
@@ -66,7 +66,7 @@ func (cook *WalletConsoleCommandCook) CookArguments(par *consolewallet.ConsoleCo
 	result["rpckey"] = par.KeyFile
 	result["nogrpc"] = commandline.NoArgumentValue
 
-	result[dcrharness.NetworkFor(par.Network)] = commandline.NoArgumentValue
+	result[btcharness.NetworkFor(par.Network)] = commandline.NoArgumentValue
 
 	commandline.ArgumentsCopyTo(par.ExtraArguments, result)
 	return result

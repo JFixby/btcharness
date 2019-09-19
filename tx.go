@@ -1,7 +1,7 @@
-package dcrharness
+package btcharness
 
 import (
-	"github.com/decred/dcrd/wire"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/jfixby/coinharness"
 )
 

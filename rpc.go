@@ -51,6 +51,14 @@ func (c *RPCClient) SubmitBlock(block coinharness.Block) (error) {
 	return c.rpc.SubmitBlock(block.(*btcutil.Block), nil)
 }
 
+func (c *RPCClient) LoadTxFilter(reload bool, addr []coinharness.Address) (error) {
+	addresses := []btcutil.Address{}
+	for _, e := range addr {
+		addresses = append(addresses, e.Internal().(btcutil.Address))
+	}
+	return c.rpc.LoadTxFilter(reload, addresses, nil)
+}
+
 func (c *RPCClient) AddNode(args *coinharness.AddNodeArguments) error {
 	return c.rpc.AddNode(args.TargetAddr, args.Command.(rpcclient.AddNodeCommand))
 }

@@ -53,7 +53,7 @@ type InMemoryWallet struct {
 	// received. Once a block is disconnected, the undo entry for the
 	// particular height is evaluated, thereby rewinding the effect of the
 	// disconnected block on the wallet's set of spendable utxos.
-	reorgJournal map[int32]*undoEntry
+	reorgJournal map[int64]*undoEntry
 
 	chainUpdates []*chainUpdate
 
@@ -174,7 +174,7 @@ func (wallet *InMemoryWallet) IngestBlock(height int32, header *wire.BlockHeader
 	// Append this new chain update to the end of the queue of new chain
 	// updates.
 	wallet.chainMtx.Lock()
-	wallet.chainUpdates = append(wallet.chainUpdates, &chainUpdate{height,
+	wallet.chainUpdates = append(wallet.chainUpdates, &chainUpdate{int64(height),
 		filteredTxns, true})
 	wallet.chainMtx.Unlock()
 
@@ -295,7 +295,7 @@ func (wallet *InMemoryWallet) UnwindBlock(height int32, header *wire.BlockHeader
 	// Append this new chain update to the end of the queue of new chain
 	// updates.
 	wallet.chainMtx.Lock()
-	wallet.chainUpdates = append(wallet.chainUpdates, &chainUpdate{height,
+	wallet.chainUpdates = append(wallet.chainUpdates, &chainUpdate{int64(height),
 		nil, false})
 	wallet.chainMtx.Unlock()
 
@@ -401,7 +401,7 @@ func (wallet *InMemoryWallet) fundTx(tx *wire.MsgTx, amt btcutil.Amount, feeRate
 		// Add the selected output to the transaction, updating the
 		// current tx size while accounting for the size of the future
 		// sigScript.
-		tx.AddTxIn(wire.NewTxIn(&outPoint, utxo.value, nil))
+		tx.AddTxIn(wire.NewTxIn(&outPoint, nil, nil))
 		txSize = tx.SerializeSize() + spendSize*len(tx.TxIn)
 
 		// Calculate the fee required for the txn at this point

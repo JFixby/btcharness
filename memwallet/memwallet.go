@@ -53,7 +53,7 @@ type InMemoryWallet struct {
 	// received. Once a block is disconnected, the undo entry for the
 	// particular height is evaluated, thereby rewinding the effect of the
 	// disconnected block on the wallet's set of spendable utxos.
-	reorgJournal map[int64]*undoEntry
+	reorgJournal map[int32]*undoEntry
 
 	chainUpdates []*chainUpdate
 
@@ -122,12 +122,12 @@ func (wallet *InMemoryWallet) Start(args *coinharness.TestWalletStartArgs) error
 }
 
 func (wallet *InMemoryWallet) updateTxFilter() {
-	filterAddrs := []btcutil.Address{}
+	filterAddrs := []coinharness.Address{}
 	for _, v := range wallet.addrs {
-		filterAddrs = append(filterAddrs, v)
+		filterAddrs = append(filterAddrs, &btcharness.Address{v})
 	}
 	//pin.D("filterAddrs", filterAddrs)
-	err := wallet.nodeRPC.LoadTxFilter(true, filterAddrs, nil)
+	err := wallet.nodeRPC.LoadTxFilter(true, filterAddrs)
 	pin.CheckTestSetupMalfunction(err)
 }
 
@@ -170,7 +170,7 @@ func (wallet *InMemoryWallet) SyncedHeight() int64 {
 // IngestBlock is a call-back which is to be triggered each time a new block is
 // connected to the main chain. It queues the update for the chain syncer,
 // calling the private version in sequential order.
-func (wallet *InMemoryWallet) IngestBlock(height int64, header *wire.BlockHeader, filteredTxns []*btcutil.Tx) {
+func (wallet *InMemoryWallet) IngestBlock(height int32, header *wire.BlockHeader, filteredTxns []*btcutil.Tx) {
 	// Append this new chain update to the end of the queue of new chain
 	// updates.
 	wallet.chainMtx.Lock()
@@ -192,7 +192,7 @@ func (wallet *InMemoryWallet) ingestBlock(update *chainUpdate) {
 	// Update the latest synced height, then process each filtered
 	// transaction in the block creating and destroying utxos within
 	// the wallet as a result.
-	wallet.currentHeight = update.blockHeight
+	wallet.currentHeight = int64(update.blockHeight)
 	undo := &undoEntry{
 		utxosDestroyed: make(map[wire.OutPoint]*utxo),
 	}
@@ -291,7 +291,7 @@ func (wallet *InMemoryWallet) evalInputs(inputs []*wire.TxIn, undo *undoEntry) {
 // UnwindBlock is a call-back which is to be executed each time a block is
 // disconnected from the main chain. It queues the update for the chain syncer,
 // calling the private version in sequential order.
-func (wallet *InMemoryWallet) UnwindBlock(height int64, header *wire.BlockHeader) {
+func (wallet *InMemoryWallet) UnwindBlock(height int32, header *wire.BlockHeader) {
 	// Append this new chain update to the end of the queue of new chain
 	// updates.
 	wallet.chainMtx.Lock()
@@ -343,7 +343,7 @@ func (wallet *InMemoryWallet) newAddress() (btcutil.Address, error) {
 		return nil, err
 	}
 
-	err = wallet.nodeRPC.LoadTxFilter(false, []btcutil.Address{addr}, nil)
+	err = wallet.nodeRPC.LoadTxFilter(false, []coinharness.Address{&btcharness.Address{addr}})
 	if err != nil {
 		return nil, err
 	}
@@ -377,7 +377,7 @@ func (wallet *InMemoryWallet) NewAddress(_ *coinharness.NewAddressArgs) (coinhar
 // atoms-per-byte.
 //
 // NOTE: The InMemoryWallet's mutex must be held when this function is called.
-func (wallet *InMemoryWallet) fundTx(tx *wire.MsgTx, amt btcutil.Amount, feeRate btcutil.Amount) error {
+func (wallet *InMemoryWallet) fundTx(tx *wire.MsgTx, amt btcutil.Amount, feeRate btcutil.Amount, change bool) error {
 	const (
 		// spendSize is the largest number of bytes of a sigScript
 		// which spends a p2pkh output: OP_DATA_73 <sig> OP_DATA_33 <pubkey>
@@ -401,7 +401,7 @@ func (wallet *InMemoryWallet) fundTx(tx *wire.MsgTx, amt btcutil.Amount, feeRate
 		// Add the selected output to the transaction, updating the
 		// current tx size while accounting for the size of the future
 		// sigScript.
-		tx.AddTxIn(wire.NewTxIn(&outPoint, utxo.value., nil))
+		tx.AddTxIn(wire.NewTxIn(&outPoint, utxo.value, nil))
 		txSize = tx.SerializeSize() + spendSize*len(tx.TxIn)
 
 		// Calculate the fee required for the txn at this point
@@ -444,7 +444,7 @@ func (wallet *InMemoryWallet) fundTx(tx *wire.MsgTx, amt btcutil.Amount, feeRate
 // SendOutputs creates, then sends a transaction paying to the specified output
 // while observing the passed fee rate. The passed fee rate should be expressed
 // in satoshis-per-byte.
-func (wallet *InMemoryWallet) SendOutputs(args *coinharness.SendOutputsArgs) (coinharness.SentOutputsHash, error) {
+func (wallet *InMemoryWallet) SendOutputs(args *coinharness.SendOutputsArgs) (coinharness.Hash, error) {
 	arg2 := &coinharness.CreateTransactionArgs{
 		Outputs: args.Outputs,
 		FeeRate: args.FeeRate,
@@ -455,7 +455,7 @@ func (wallet *InMemoryWallet) SendOutputs(args *coinharness.SendOutputsArgs) (co
 		return nil, err
 	}
 
-	return wallet.nodeRPC.SendRawTransaction(tx.(*wire.MsgTx), true)
+	return wallet.nodeRPC.SendRawTransaction(tx, true)
 }
 
 // SendOutputsWithoutChange creates and sends a transaction that pays to the
@@ -502,7 +502,7 @@ func (wallet *InMemoryWallet) CreateTransaction(args *coinharness.CreateTransact
 	// selection shortly below.
 	var outputAmt btcutil.Amount
 	for _, output := range args.Outputs {
-		outputAmt += btcutil.Amount(output.(*wire.TxOut).Value)
+		outputAmt += btcutil.Amount(output.Value())
 		tx.AddTxOut(output.(*btcharness.OutputTx).Parent)
 	}
 

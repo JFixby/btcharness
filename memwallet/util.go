@@ -18,7 +18,7 @@ const stopSignal = "stopSignal"
 // used to sync up the InMemoryWallet each time a new block is connected to the main
 // chain.
 type chainUpdate struct {
-	blockHeight  int64
+	blockHeight  int32
 	filteredTxns []*btcutil.Tx
 	isConnect    bool // True if connect, false if disconnect
 }

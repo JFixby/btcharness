@@ -360,7 +360,7 @@ func (wallet *InMemoryWallet) integrationdress() (btcutil.Address, error) {
 // NewAddress returns a fresh address spendable by the wallet.
 //
 // This function is safe for concurrent access.
-func (wallet *InMemoryWallet) NewAddress(_ *coinharness.NewAddressArgs) (coinharness.Address, error) {
+func (wallet *InMemoryWallet) NewAddress(_ coinharness.NewAddressArgs) (coinharness.Address, error) {
 	wallet.Lock()
 	defer wallet.Unlock()
 

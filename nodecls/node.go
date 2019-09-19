@@ -18,8 +18,8 @@ import (
 type ConsoleNodeFactory struct {
 	// NodeExecutablePathProvider returns path to the btcd executable
 	NodeExecutablePathProvider commandline.ExecutablePathProvider
-	ConsoleCommandCook         BtcdConsoleCommandCook
-	RPCClientFactory           btcharness.BtcRPCClientFactory
+	ConsoleCommandCook         ConsoleCommandCook
+	RPCClientFactory           btcharness.RPCClientFactory
 }
 
 // NewNode creates and returns a fully initialized instance of the ConsoleNode.
@@ -47,11 +47,11 @@ func (factory *ConsoleNodeFactory) NewNode(config *coinharness.TestNodeConfig) c
 	return consolenode.NewConsoleNode(args)
 }
 
-type BtcdConsoleCommandCook struct {
+type ConsoleCommandCook struct {
 }
 
 // cookArguments prepares arguments for the command-line call
-func (cook *BtcdConsoleCommandCook) CookArguments(par *consolenode.ConsoleCommandParams) map[string]interface{} {
+func (cook *ConsoleCommandCook) CookArguments(par *consolenode.ConsoleCommandParams) map[string]interface{} {
 	result := make(map[string]interface{})
 
 	result["txindex"] = commandline.NoArgumentValue

@@ -7,6 +7,7 @@ package btcharness
 import (
 	"fmt"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcutil"
 	"github.com/jfixby/coinharness"
@@ -14,10 +15,10 @@ import (
 	"io/ioutil"
 )
 
-type BtcRPCClientFactory struct {
+type RPCClientFactory struct {
 }
 
-func (f *BtcRPCClientFactory) NewRPCConnection(config coinharness.RPCConnectionConfig, handlers coinharness.RPCClientNotificationHandlers) (coinharness.RPCClient, error) {
+func (f *RPCClientFactory) NewRPCConnection(config coinharness.RPCConnectionConfig, handlers coinharness.RPCClientNotificationHandlers) (coinharness.RPCClient, error) {
 	var h *rpcclient.NotificationHandlers
 	if handlers != nil {
 		h = handlers.
@@ -42,31 +43,39 @@ func (f *BtcRPCClientFactory) NewRPCConnection(config coinharness.RPCConnectionC
 	return NewRPCClient(cfg, h)
 }
 
-type BTCPCClient struct {
+type RPCClient struct {
 	rpc *rpcclient.Client
 }
 
-func (c *BTCPCClient) AddNode(args *coinharness.AddNodeArguments) error {
+func (c *RPCClient) SubmitBlock(block coinharness.Block) (error) {
+	return c.rpc.SubmitBlock(block.(*btcutil.Block), nil)
+}
+
+func (c *RPCClient) AddNode(args *coinharness.AddNodeArguments) error {
 	return c.rpc.AddNode(args.TargetAddr, args.Command.(rpcclient.AddNodeCommand))
 }
 
-func (c *BTCPCClient) Disconnect() {
+func (c *RPCClient) Disconnect() {
 	c.rpc.Disconnect()
 }
 
-func (c *BTCPCClient) Shutdown() {
+func (c *RPCClient) Shutdown() {
 	c.rpc.Shutdown()
 }
 
-func (c *BTCPCClient) NotifyBlocks() error {
+func (c *RPCClient) GetBlock(hash coinharness.Hash) (coinharness.Block, error) {
+	return c.rpc.GetBlock(hash.(*chainhash.Hash))
+}
+
+func (c *RPCClient) NotifyBlocks() error {
 	return c.rpc.NotifyBlocks()
 }
 
-func (c *BTCPCClient) GetBlockCount() (int64, error) {
+func (c *RPCClient) GetBlockCount() (int64, error) {
 	return c.rpc.GetBlockCount()
 }
 
-func (c *BTCPCClient) Generate(blocks uint32) (result []coinharness.Hash, e error) {
+func (c *RPCClient) Generate(blocks uint32) (result []coinharness.Hash, e error) {
 	list, e := c.rpc.Generate(blocks)
 	if e != nil {
 		return nil, e
@@ -77,11 +86,11 @@ func (c *BTCPCClient) Generate(blocks uint32) (result []coinharness.Hash, e erro
 	return result, nil
 }
 
-func (c *BTCPCClient) Internal() interface{} {
+func (c *RPCClient) Internal() interface{} {
 	return c.rpc
 }
 
-func (c *BTCPCClient) GetRawMempool(_ interface{}) (result []coinharness.Hash, e error) {
+func (c *RPCClient) GetRawMempool(_ interface{}) (result []coinharness.Hash, e error) {
 	list, e := c.rpc.GetRawMempool()
 	if e != nil {
 		return nil, e
@@ -92,13 +101,13 @@ func (c *BTCPCClient) GetRawMempool(_ interface{}) (result []coinharness.Hash, e
 	return result, nil
 }
 
-func (c *BTCPCClient) SendRawTransaction(tx coinharness.CreatedTransactionTx, allowHighFees bool) (result coinharness.Hash, e error) {
+func (c *RPCClient) SendRawTransaction(tx coinharness.CreatedTransactionTx, allowHighFees bool) (result coinharness.Hash, e error) {
 	txx := TransactionTxToRaw(tx)
 	r, e := c.rpc.SendRawTransaction(txx, allowHighFees)
 	return r, e
 }
 
-func (c *BTCPCClient) GetPeerInfo() ([]coinharness.PeerInfo, error) {
+func (c *RPCClient) GetPeerInfo() ([]coinharness.PeerInfo, error) {
 	pif, err := c.rpc.GetPeerInfo()
 	if err != nil {
 		return nil, err
@@ -120,21 +129,21 @@ func NewRPCClient(config *rpcclient.ConnConfig, handlers *rpcclient.Notification
 		return nil, err
 	}
 
-	result := &BTCPCClient{rpc: legacy}
+	result := &RPCClient{rpc: legacy}
 	return result, nil
 }
 
-func (c *BTCPCClient) GetNewAddress(account string) (coinharness.Address, error) {
+func (c *RPCClient) GetNewAddress(account string) (coinharness.Address, error) {
 	legacy, err := c.rpc.GetNewAddress(account)
 	if err != nil {
 		return nil, err
 	}
 
-	result := &BTCAddress{Address: legacy}
+	result := &Address{Address: legacy}
 	return result, nil
 }
 
-func (c *BTCPCClient) ValidateAddress(address coinharness.Address) (*coinharness.ValidateAddressResult, error) {
+func (c *RPCClient) ValidateAddress(address coinharness.Address) (*coinharness.ValidateAddressResult, error) {
 	legacy, err := c.rpc.ValidateAddress(address.Internal().(btcutil.Address))
 	// *btcjson.ValidateAddressWalletResult
 	if err != nil {
@@ -150,53 +159,46 @@ func (c *BTCPCClient) ValidateAddress(address coinharness.Address) (*coinharness
 	return result, nil
 }
 
-func (c *BTCPCClient) GetBalance(account string) (*coinharness.GetBalanceResult, error) {
+func (c *RPCClient) GetBalance(account string) (*coinharness.GetBalanceResult, error) {
 	legacy, err := c.rpc.GetBalance(account)
 	// *btcjson.ValidateAddressWalletResult
 	if err != nil {
 		return nil, err
 	}
 	result := &coinharness.GetBalanceResult{
-		BlockHash:      legacy.BlockHash,
-		TotalSpendable: legacy.TotalSpendable,
+		TotalSpendable: legacy,
 	}
 	return result, nil
 }
 
-func (c *BTCPCClient) GetBestBlock() (coinharness.Hash, int64, error) {
-	return c.rpc.GetBestBlock()
+func (c *RPCClient) GetBestBlock() (coinharness.Hash, int64, error) {
+	x, y, z := c.rpc.GetBestBlock()
+	return x, int64(y), z
 }
 
-func (c *BTCPCClient) CreateNewAccount(account string) error {
+func (c *RPCClient) CreateNewAccount(account string) error {
 	return c.rpc.CreateNewAccount(account)
 }
 
-func (c *BTCPCClient) WalletLock() error {
+func (c *RPCClient) WalletLock() error {
 	return c.rpc.WalletLock()
 }
 
-func (c *BTCPCClient) WalletInfo() (*coinharness.WalletInfoResult, error) {
-	r, err := c.rpc.WalletInfo()
-	if err != nil {
-		return nil, err
-	}
-	result := &coinharness.WalletInfoResult{
-		Unlocked:        r.Unlocked,
-		DaemonConnected: r.DaemonConnected,
-		Voting:          r.DaemonConnected,
-	}
-	return result, nil
+func (c *RPCClient) WalletInfo() (*coinharness.WalletInfoResult, error) {
+	//result := &coinharness.WalletInfoResult{
+	//}
+	return nil, fmt.Errorf("method is not supported WalletInfo()")
 }
 
-func (c *BTCPCClient) WalletUnlock(passphrase string, timeoutSecs int64) error {
+func (c *RPCClient) WalletUnlock(passphrase string, timeoutSecs int64) error {
 	return c.rpc.WalletPassphrase(passphrase, timeoutSecs)
 }
 
-func (c *BTCPCClient) CreateTransaction(*coinharness.CreateTransactionArgs) (coinharness.CreatedTransactionTx, error) {
+func (c *RPCClient) CreateTransaction(*coinharness.CreateTransactionArgs) (coinharness.CreatedTransactionTx, error) {
 	panic("")
 }
 
-func (c *BTCPCClient) GetBuildVersion() (coinharness.BuildVersion, error) {
+func (c *RPCClient) GetBuildVersion() (coinharness.BuildVersion, error) {
 	//legacy, err := c.rpc.GetBuildVersion()
 	//if err != nil {
 	//	return nil, err
@@ -205,18 +207,18 @@ func (c *BTCPCClient) GetBuildVersion() (coinharness.BuildVersion, error) {
 	return nil, fmt.Errorf("bitcoin does not support this feature (GetBuildVersion)")
 }
 
-type BTCAddress struct {
+type Address struct {
 	Address btcutil.Address
 }
 
-func (c *BTCAddress) String() string {
+func (c *Address) String() string {
 	return c.Address.String()
 }
 
-func (c *BTCAddress) Internal() interface{} {
+func (c *Address) Internal() interface{} {
 	return c.Address
 }
 
-func (c *BTCAddress) IsForNet(net coinharness.Network) bool {
+func (c *Address) IsForNet(net coinharness.Network) bool {
 	return c.Address.IsForNet(net.(*chaincfg.Params))
 }

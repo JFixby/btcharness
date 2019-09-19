@@ -13,7 +13,7 @@ type ConsoleWalletFactory struct {
 	// WalletExecutablePathProvider returns path to the btcd executable
 	WalletExecutablePathProvider commandline.ExecutablePathProvider
 	ConsoleCommandCook           WalletConsoleCommandCook
-	RPCClientFactory             btcharness.BtcRPCClientFactory
+	RPCClientFactory             btcharness.RPCClientFactory
 }
 
 // NewWallet creates and returns a fully initialized instance of the ConsoleWallet.

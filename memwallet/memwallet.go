@@ -170,7 +170,7 @@ func (wallet *InMemoryWallet) SyncedHeight() int64 {
 // IngestBlock is a call-back which is to be triggered each time a new block is
 // connected to the main chain. It queues the update for the chain syncer,
 // calling the private version in sequential order.
-func (wallet *InMemoryWallet) IngestBlock(height int32, header *wire.BlockHeader, filteredTxns []*btcutil.Tx) {
+func (wallet *InMemoryWallet) IngestBlock(height int64, header *wire.BlockHeader, filteredTxns []*btcutil.Tx) {
 	// Append this new chain update to the end of the queue of new chain
 	// updates.
 	wallet.chainMtx.Lock()
@@ -291,7 +291,7 @@ func (wallet *InMemoryWallet) evalInputs(inputs []*wire.TxIn, undo *undoEntry) {
 // UnwindBlock is a call-back which is to be executed each time a block is
 // disconnected from the main chain. It queues the update for the chain syncer,
 // calling the private version in sequential order.
-func (wallet *InMemoryWallet) UnwindBlock(height int32, header *wire.BlockHeader) {
+func (wallet *InMemoryWallet) UnwindBlock(height int64, header *wire.BlockHeader) {
 	// Append this new chain update to the end of the queue of new chain
 	// updates.
 	wallet.chainMtx.Lock()
@@ -368,7 +368,7 @@ func (wallet *InMemoryWallet) NewAddress(_ *coinharness.NewAddressArgs) (coinhar
 		return nil, err
 	}
 
-	return &btcharness.BTCAddress{Address: add}, nil
+	return &btcharness.Address{Address: add}, nil
 }
 
 // fundTx attempts to fund a transaction sending amt coins.  The coins are
@@ -401,7 +401,7 @@ func (wallet *InMemoryWallet) fundTx(tx *wire.MsgTx, amt btcutil.Amount, feeRate
 		// Add the selected output to the transaction, updating the
 		// current tx size while accounting for the size of the future
 		// sigScript.
-		tx.AddTxIn(wire.NewTxIn(&outPoint, int64(utxo.value), nil))
+		tx.AddTxIn(wire.NewTxIn(&outPoint, utxo.value., nil))
 		txSize = tx.SerializeSize() + spendSize*len(tx.TxIn)
 
 		// Calculate the fee required for the txn at this point

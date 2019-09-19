@@ -71,7 +71,7 @@ func GenerateAndSubmitBlockWithCustomCoinbaseOutputs(client coinharness.RPCClien
 	if err != nil {
 		return nil, err
 	}
-	prevBlock := btcutil.NewBlock(mBlock)
+	prevBlock := btcutil.NewBlock(mBlock.(*wire.MsgBlock))
 	prevBlock.SetHeight(int32(prevBlockHeight))
 
 	// Create a new block including the specified transactions
@@ -82,13 +82,12 @@ func GenerateAndSubmitBlockWithCustomCoinbaseOutputs(client coinharness.RPCClien
 	}
 
 	// Submit the block to the simnet node.
-	if err := client.SubmitBlock(newBlock, nil); err != nil {
+	if err := client.SubmitBlock(newBlock); err != nil {
 		return nil, err
 	}
 
 	return newBlock, nil
 }
-
 
 // CreateBlock creates a new block building from the previous block with a
 // specified blockversion and timestamp. If the timestamp passed is zero (not
@@ -168,7 +167,6 @@ func CreateBlock(prevBlock *btcutil.Block, inclusionTxs []*btcutil.Tx,
 	utilBlock.SetHeight(blockHeight)
 	return utilBlock, nil
 }
-
 
 // solveBlock attempts to find a nonce which makes the passed block header hash
 // to a value less than the target difficulty. When a successful solution is

@@ -39,7 +39,7 @@ type InMemoryWallet struct {
 
 	// currentHeight is the latest height the wallet is known to be synced
 	// to.
-	currentHeight int32
+	currentHeight int64
 
 	// addrs tracks all addresses belonging to the wallet. The addresses
 	// are indexed by their keypath from the hdRoot.
@@ -52,7 +52,7 @@ type InMemoryWallet struct {
 	// received. Once a block is disconnected, the undo entry for the
 	// particular height is evaluated, thereby rewinding the effect of the
 	// disconnected block on the wallet's set of spendable utxos.
-	reorgJournal map[int32]*undoEntry
+	reorgJournal map[int64]*undoEntry
 
 	chainUpdates []*chainUpdate
 
@@ -63,7 +63,7 @@ type InMemoryWallet struct {
 
 	net *chaincfg.Params
 
-	nodeRPC *rpcclient.Client
+	nodeRPC coinharness.RPCClient
 
 	sync.RWMutex
 	RPCClientFactory coinharness.RPCClientFactory
@@ -106,7 +106,7 @@ func (wallet *InMemoryWallet) Start(args *coinharness.TestWalletStartArgs) error
 
 	//handlers.OnClientConnected = wallet.onDcrdConnect
 
-	wallet.nodeRPC = coinharness.NewRPCConnection(wallet.RPCClientFactory, args.NodeRPCConfig, 5, handlers).(*rpcclient.Client)
+	wallet.nodeRPC = coinharness.NewRPCConnection(wallet.RPCClientFactory, args.NodeRPCConfig, 5, handlers)
 	pin.AssertNotNil("nodeRPC", wallet.nodeRPC)
 
 	// Filter transactions that pay to the coinbase associated with the
@@ -143,16 +143,15 @@ func (wallet *InMemoryWallet) Stop() {
 
 // Sync block until the wallet has fully synced up to the tip of the main
 // chain.
-func (wallet *InMemoryWallet) Sync() {
-	_, height, err := wallet.nodeRPC.GetBestBlock()
-	pin.CheckTestSetupMalfunction(err)
+func (wallet *InMemoryWallet) Sync(desiredHeight int64) int64 {
 	ticker := time.NewTicker(time.Millisecond * 100)
 	for range ticker.C {
 		walletHeight := wallet.SyncedHeight()
-		if walletHeight == height {
+		if walletHeight >= desiredHeight {
 			break
 		}
 	}
+	return wallet.SyncedHeight()
 }
 
 // Dispose is no needed for InMemoryWallet
@@ -163,7 +162,7 @@ func (wallet *InMemoryWallet) Dispose() error {
 // SyncedHeight returns the height the wallet is known to be synced to.
 //
 // This function is safe for concurrent access.
-func (wallet *InMemoryWallet) SyncedHeight() int32 {
+func (wallet *InMemoryWallet) SyncedHeight() int64 {
 	wallet.RLock()
 	defer wallet.RUnlock()
 	return wallet.currentHeight
@@ -258,9 +257,9 @@ func (wallet *InMemoryWallet) evalOutputs(outputs []*wire.TxOut, txHash *chainha
 			// If this is a coinbase output, then we mark the
 			// maturity height at the proper block height in the
 			// future.
-			var maturityHeight int32
+			var maturityHeight int64
 			if isCoinbase {
-				maturityHeight = wallet.currentHeight + int32(wallet.net.CoinbaseMaturity)
+				maturityHeight = wallet.currentHeight + int64(wallet.net.CoinbaseMaturity)
 			}
 
 			op := wire.OutPoint{Hash: *txHash, Index: uint32(i)}
@@ -325,10 +324,10 @@ func (wallet *InMemoryWallet) unwindBlock(update *chainUpdate) {
 	delete(wallet.reorgJournal, update.blockHeight)
 }
 
-// integrationdress returns a new address from the wallet's hd key chain.  It also
+// newAddress returns a new address from the wallet's hd key chain.  It also
 // loads the address into the RPC client's transaction filter to ensure any
 // transactions that involve it are delivered via the notifications.
-func (wallet *InMemoryWallet) integrationdress() (btcutil.Address, error) {
+func (wallet *InMemoryWallet) newAddress() (dcrutil.Address, error) {
 	index := wallet.hdIndex
 
 	childKey, err := wallet.hdRoot.Child(index)
@@ -360,11 +359,12 @@ func (wallet *InMemoryWallet) integrationdress() (btcutil.Address, error) {
 // NewAddress returns a fresh address spendable by the wallet.
 //
 // This function is safe for concurrent access.
-func (wallet *InMemoryWallet) NewAddress(_ coinharness.NewAddressArgs) (coinharness.Address, error) {
+func (wallet *InMemoryWallet) NewAddress(_ *coinharness.NewAddressArgs) (coinharness.Address, error) {
 	wallet.Lock()
 	defer wallet.Unlock()
 
-	return wallet.integrationdress()
+	add, err := wallet.newAddress()
+
 }
 
 // fundTx attempts to fund a transaction sending amt bitcoin. The coins are

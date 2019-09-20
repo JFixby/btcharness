@@ -9,6 +9,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
+	"github.com/jfixby/coinharness"
 )
 
 const chainUpdateSignal = "chainUpdateSignal"
@@ -49,9 +50,9 @@ func (u *utxo) isMature(height int64) bool {
 }
 
 // keyToAddr maps the passed private to corresponding p2pkh address.
-func keyToAddr(key *btcec.PrivateKey, net *chaincfg.Params) (btcutil.Address, error) {
+func keyToAddr(key *btcec.PrivateKey, net coinharness.Network) (btcutil.Address, error) {
 	serializedKey := key.PubKey().SerializeCompressed()
-	pubKeyAddr, err := btcutil.NewAddressPubKey(serializedKey, net)
+	pubKeyAddr, err := btcutil.NewAddressPubKey(serializedKey, net.Params().(*chaincfg.Params))
 	if err != nil {
 		return nil, err
 	}

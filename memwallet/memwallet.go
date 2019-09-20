@@ -15,7 +15,6 @@ import (
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/txscript"
@@ -62,7 +61,7 @@ type InMemoryWallet struct {
 
 	chainMtx sync.Mutex
 
-	net *chaincfg.Params
+	net coinharness.Network
 
 	nodeRPC coinharness.RPCClient
 
@@ -258,7 +257,7 @@ func (wallet *InMemoryWallet) evalOutputs(outputs []*wire.TxOut, txHash *chainha
 			// future.
 			var maturityHeight int64
 			if isCoinbase {
-				maturityHeight = wallet.currentHeight + int64(wallet.net.CoinbaseMaturity)
+				maturityHeight = wallet.currentHeight + int64(wallet.net.CoinbaseMaturity())
 			}
 
 			op := wire.OutPoint{Hash: *txHash, Index: uint32(i)}

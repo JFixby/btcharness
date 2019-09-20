@@ -22,13 +22,13 @@ type WalletFactory struct {
 // NewWallet creates and returns a fully initialized instance of the InMemoryWallet.
 func (f *WalletFactory) NewWallet(cfg *coinharness.TestWalletConfig) coinharness.Wallet {
 	pin.AssertNotNil("ActiveNet", cfg.ActiveNet)
-	w, e := newMemWallet(cfg.ActiveNet.(*chaincfg.Params), cfg.Seed.([chainhash.HashSize + 4]byte))
+	w, e := newMemWallet(cfg.ActiveNet, cfg.Seed.([chainhash.HashSize + 4]byte))
 	pin.CheckTestSetupMalfunction(e)
 	return w
 }
 
-func newMemWallet(net *chaincfg.Params, harnessHDSeed [chainhash.HashSize + 4]byte) (*InMemoryWallet, error) {
-	hdRoot, err := hdkeychain.NewMaster(harnessHDSeed[:], net)
+func newMemWallet(net coinharness.Network, harnessHDSeed [chainhash.HashSize + 4]byte) (*InMemoryWallet, error) {
+	hdRoot, err := hdkeychain.NewMaster(harnessHDSeed[:], net.Params().(*chaincfg.Params))
 	if err != nil {
 		return nil, nil
 	}

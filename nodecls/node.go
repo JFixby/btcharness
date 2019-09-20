@@ -5,8 +5,6 @@
 package nodecls
 
 import (
-	"fmt"
-	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/jfixby/btcharness"
 	"github.com/jfixby/coinharness"
 	"github.com/jfixby/coinharness/consolenode"
@@ -73,25 +71,4 @@ func (cook *ConsoleCommandCook) CookArguments(par *consolenode.ConsoleCommandPar
 
 	commandline.ArgumentsCopyTo(par.ExtraArguments, result)
 	return result
-}
-
-// networkFor resolves network argument for node and wallet console commands
-func networkFor(net coinharness.Network) string {
-	if net == &chaincfg.SimNetParams {
-		return "simnet"
-	}
-	if net == &chaincfg.TestNet3Params {
-		return "testnet"
-	}
-	if net == &chaincfg.RegressionNetParams {
-		return "regtest"
-	}
-	if net == &chaincfg.MainNetParams {
-		// no argument needed for the MainNet
-		return commandline.NoArgument
-	}
-
-	// should never reach this line, report violation
-	pin.ReportTestSetupMalfunction(fmt.Errorf("unknown network: %v ", net))
-	return ""
 }

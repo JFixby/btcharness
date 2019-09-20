@@ -1,7 +1,3 @@
-// Copyright (c) 2018 The btcsuite developers
-// Use of this source code is governed by an ISC
-// license that can be found in the LICENSE file.
-
 package btcharness
 
 import (
@@ -21,8 +17,7 @@ type RPCClientFactory struct {
 func (f *RPCClientFactory) NewRPCConnection(config coinharness.RPCConnectionConfig, handlers coinharness.RPCClientNotificationHandlers) (coinharness.RPCClient, error) {
 	var h *rpcclient.NotificationHandlers
 	if handlers != nil {
-		h = handlers.
-		(*rpcclient.NotificationHandlers)
+		h = handlers.(*rpcclient.NotificationHandlers)
 	}
 
 	file := config.CertificateFile
@@ -47,11 +42,11 @@ type RPCClient struct {
 	rpc *rpcclient.Client
 }
 
-func (c *RPCClient) SubmitBlock(block coinharness.Block) (error) {
+func (c *RPCClient) SubmitBlock(block coinharness.Block) error {
 	return c.rpc.SubmitBlock(block.(*btcutil.Block), nil)
 }
 
-func (c *RPCClient) LoadTxFilter(reload bool, addr []coinharness.Address) (error) {
+func (c *RPCClient) LoadTxFilter(reload bool, addr []coinharness.Address) error {
 	addresses := []btcutil.Address{}
 	for _, e := range addr {
 		addresses = append(addresses, e.Internal().(btcutil.Address))

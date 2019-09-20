@@ -2,7 +2,6 @@ package memwallet
 
 import (
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/hdkeychain"
@@ -18,13 +17,13 @@ type WalletFactory struct {
 // NewWallet creates and returns a fully initialized instance of the InMemoryWallet.
 func (f *WalletFactory) NewWallet(cfg *coinharness.TestWalletConfig) coinharness.Wallet {
 	pin.AssertNotNil("ActiveNet", cfg.ActiveNet)
-	w, e := newMemWallet(cfg.ActiveNet, cfg.Seed.([chainhash.HashSize + 4]byte))
+	w, e := newMemWallet(cfg.ActiveNet, cfg.Seed)
 	pin.CheckTestSetupMalfunction(e)
 	return w
 }
 
-func newMemWallet(net coinharness.Network, harnessHDSeed [chainhash.HashSize + 4]byte) (*InMemoryWallet, error) {
-	hdRoot, err := hdkeychain.NewMaster(harnessHDSeed[:], net.Params().(*chaincfg.Params))
+func newMemWallet(net coinharness.Network, harnessHDSeed coinharness.Seed) (*InMemoryWallet, error) {
+	hdRoot, err := hdkeychain.NewMaster(harnessHDSeed.([]byte)[:], net.Params().(*chaincfg.Params))
 	if err != nil {
 		return nil, nil
 	}

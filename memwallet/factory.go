@@ -15,12 +15,12 @@ import (
 	"github.com/jfixby/pin"
 )
 
-// MemWalletFactory produces a new InMemoryWallet-instance upon request
-type MemWalletFactory struct {
+// WalletFactory produces a new InMemoryWallet-instance upon request
+type WalletFactory struct {
 }
 
 // NewWallet creates and returns a fully initialized instance of the InMemoryWallet.
-func (f *MemWalletFactory) NewWallet(cfg *coinharness.TestWalletConfig) coinharness.Wallet {
+func (f *WalletFactory) NewWallet(cfg *coinharness.TestWalletConfig) coinharness.Wallet {
 	pin.AssertNotNil("ActiveNet", cfg.ActiveNet)
 	w, e := newMemWallet(cfg.ActiveNet.(*chaincfg.Params), cfg.Seed.([chainhash.HashSize + 4]byte))
 	pin.CheckTestSetupMalfunction(e)

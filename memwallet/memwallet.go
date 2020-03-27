@@ -460,7 +460,7 @@ func (wallet *InMemoryWallet) SendOutputsWithoutChange(outputs []*wire.TxOut,
 	feeRate btcutil.Amount) (*chainhash.Hash, error) {
 
 	//cast list
-	b := make([]coinharness.OutputTx, len(outputs))
+	b := make([]coinharness.TxOut, len(outputs))
 	{
 		for i := range outputs {
 			b[i] = &btcharness.OutputTx{outputs[i]}
@@ -486,7 +486,7 @@ func (wallet *InMemoryWallet) SendOutputsWithoutChange(outputs []*wire.TxOut,
 // include a change output indicated by the change boolean.
 //
 // This function is safe for concurrent access.
-func (wallet *InMemoryWallet) CreateTransaction(args *coinharness.CreateTransactionArgs) (coinharness.CreatedTransactionTx, error) {
+func (wallet *InMemoryWallet) CreateTransaction(args *coinharness.CreateTransactionArgs) (coinharness.MessageTx, error) {
 
 	wallet.Lock()
 	defer wallet.Unlock()
@@ -549,7 +549,7 @@ func (wallet *InMemoryWallet) CreateTransaction(args *coinharness.CreateTransact
 // being selected to fund a transaction via the CreateTransaction method.
 //
 // This function is safe for concurrent access.
-func (wallet *InMemoryWallet) UnlockOutputs(inputs []coinharness.InputTx) error {
+func (wallet *InMemoryWallet) UnlockOutputs(inputs []coinharness.TxIn) error {
 	wallet.Lock()
 	defer wallet.Unlock()
 

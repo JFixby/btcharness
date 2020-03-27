@@ -276,7 +276,7 @@ func createCoinbaseTx(coinbaseScript []byte, nextBlockHeight int32,
 	return btcutil.NewTx(tx), nil
 }
 
-func TransactionTxToRaw(tx coinharness.CreatedTransactionTx) *wire.MsgTx {
+func TransactionTxToRaw(tx coinharness.MessageTx) *wire.MsgTx {
 	ttx := &wire.MsgTx{
 		Version:  int32(tx.Version()),
 		LockTime: tx.LockTime(),

@@ -44,16 +44,16 @@ func (o *CreatedTransactionTx) TxHash() coinharness.Hash {
 	return o.Parent.TxHash()
 }
 
-func (o *CreatedTransactionTx) TxIn() (result []coinharness.InputTx) {
-	result = []coinharness.InputTx{}
+func (o *CreatedTransactionTx) TxIn() (result []coinharness.TxIn) {
+	result = []coinharness.TxIn{}
 	for _, ti := range o.Parent.TxIn {
 		result = append(result, &InputTx{ti})
 	}
 	return
 }
 
-func (o *CreatedTransactionTx) TxOut() (result []coinharness.OutputTx) {
-	result = []coinharness.OutputTx{}
+func (o *CreatedTransactionTx) TxOut() (result []coinharness.TxOut) {
+	result = []coinharness.TxOut{}
 	for _, ti := range o.Parent.TxOut {
 		result = append(result, &OutputTx{ti})
 	}

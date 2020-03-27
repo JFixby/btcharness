@@ -42,7 +42,7 @@ type RPCClient struct {
 	rpc *rpcclient.Client
 }
 
-func (c *RPCClient) SubmitBlock(block coinharness.Block) error {
+func (c *RPCClient) SubmitBlock(block coinharness.MsgBlock) error {
 	return c.rpc.SubmitBlock(block.(*btcutil.Block), nil)
 }
 
@@ -66,7 +66,7 @@ func (c *RPCClient) Shutdown() {
 	c.rpc.Shutdown()
 }
 
-func (c *RPCClient) GetBlock(hash coinharness.Hash) (coinharness.Block, error) {
+func (c *RPCClient) GetBlock(hash coinharness.Hash) (coinharness.MsgBlock, error) {
 	return c.rpc.GetBlock(hash.(*chainhash.Hash))
 }
 
@@ -104,7 +104,7 @@ func (c *RPCClient) GetRawMempool(_ interface{}) (result []coinharness.Hash, e e
 	return result, nil
 }
 
-func (c *RPCClient) SendRawTransaction(tx coinharness.CreatedTransactionTx, allowHighFees bool) (result coinharness.Hash, e error) {
+func (c *RPCClient) SendRawTransaction(tx coinharness.MessageTx, allowHighFees bool) (result coinharness.Hash, e error) {
 	txx := TransactionTxToRaw(tx)
 	r, e := c.rpc.SendRawTransaction(txx, allowHighFees)
 	return r, e
@@ -197,7 +197,7 @@ func (c *RPCClient) WalletUnlock(passphrase string, timeoutSecs int64) error {
 	return c.rpc.WalletPassphrase(passphrase, timeoutSecs)
 }
 
-func (c *RPCClient) CreateTransaction(*coinharness.CreateTransactionArgs) (coinharness.CreatedTransactionTx, error) {
+func (c *RPCClient) CreateTransaction(*coinharness.CreateTransactionArgs) (coinharness.MessageTx, error) {
 	panic("")
 }
 

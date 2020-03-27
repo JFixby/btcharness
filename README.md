@@ -10,5 +10,13 @@ Bitcoin harness
  - [nodecls](https://github.com/jfixby/btcharness/tree/master/nodecls)
  Provides wrapper that launches a new `btcd`-instance using command-line call.
 
+ ## Build
+ ```
+ set GO111MODULE=on
+ go build ./...
+ go clean -testcache
+ go test ./...
+```
+
  ## License
  This code is licensed under the [copyfree](http://copyfree.org) ISC License.

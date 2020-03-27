@@ -2,10 +2,10 @@ package btcharness
 
 import (
 	"fmt"
-	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/jfixby/coinharness"
 	"github.com/jfixby/pin"
 	"github.com/jfixby/pin/commandline"
+	"github.com/picfight/pfcd/chaincfg"
 )
 
 type Network struct {
@@ -32,7 +32,6 @@ func NetworkFor(net coinharness.Network) string {
 		return "regtest"
 	}
 	if net.Params() == &chaincfg.MainNetParams {
-		// no argument needed for the MainNet
 		return commandline.NoArgument
 	}
 
